@@ -2,116 +2,84 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NSE Pro Dashboard</title>
+    <title>NSE Live Watchlist</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-100 p-4 font-sans">
+<body class="bg-gray-100 p-5">
 
     <div class="max-w-4xl mx-auto">
-        <header class="mb-6 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-slate-800">NSE Live Watchlist</h1>
-            <p id="timer" class="text-xs font-mono text-blue-600 font-bold bg-blue-100 px-3 py-1 rounded-full">Refreshes in 10s</p>
-        </header>
+        <h1 class="text-2xl font-bold mb-5">NSE Live Market</h1>
 
-        <div class="flex gap-2 mb-8">
-            <div class="relative flex-1">
-                <input list="allNseSymbols" id="stockSearch" placeholder="Type ANY NSE Symbol (e.g. ZOMATO, TATAMOTORS)..." 
-                    class="w-full p-4 rounded-xl border-none shadow-md focus:ring-2 focus:ring-blue-500 outline-none">
-                
-                <datalist id="allNseSymbols">
-                    </datalist>
-            </div>
-            <button onclick="addToWatchlist()" class="bg-slate-800 text-white px-8 rounded-xl font-bold hover:bg-black transition-all">
-                ADD TO LIST
+        <div class="flex gap-2 mb-6">
+            <input list="stockSuggestions" id="searchInput" placeholder="Type stock name..." 
+                   class="flex-1 p-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            
+            <datalist id="stockSuggestions">
+                <option value="NIFTY 50">
+                <option value="RELIANCE">
+                <option value="TCS">
+                <option value="HDFCBANK">
+                <option value="INFY">
+                <option value="SBIN">
+                <option value="ICICIBANK">
+            </datalist>
+
+            <button onclick="filterTable()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+                Search
             </button>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <table class="w-full text-left">
-                <thead class="bg-slate-50 border-b">
+        <div class="bg-white rounded shadow overflow-hidden">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-200">
                     <tr>
-                        <th class="p-4 text-xs font-bold text-slate-400 uppercase">Symbol</th>
-                        <th class="p-4 text-right text-xs font-bold text-slate-400 uppercase">Price</th>
-                        <th class="p-4 text-right text-xs font-bold text-slate-400 uppercase">Change %</th>
-                        <th class="p-4"></th>
+                        <th class="p-3 border">Symbol</th>
+                        <th class="p-3 border text-right">Price</th>
+                        <th class="p-3 border text-right">Change %</th>
                     </tr>
                 </thead>
-                <tbody id="tableBody" class="divide-y divide-slate-100">
-                    </tbody>
+                <tbody id="tableBody"></tbody>
             </table>
         </div>
     </div>
 
     <script>
-        const googleScriptUrl = "YOUR_SCRIPT_URL_HERE";
-        let watchlist = ["NIFTY 50", "RELIANCE", "TCS", "HDFCBANK", "INFY"];
-        let countdown = 10;
+        const googleScriptUrl = "https://script.google.com/macros/s/AKfycbyuZjax1MdlFZhdBvmskxmUPQNxgzYsCDTzLUwX3p3-CzpDTgZOKQNzV2c_K1qnqAJx/exec";
 
-        // 1. Fetch ALL NSE Symbols for the suggestions dropdown
-        async function loadSuggestions() {
+        async function loadData() {
             try {
-                // Fetching a public list of NSE symbols
-                const res = await fetch('https://raw.githubusercontent.com/senthilp/indian-stock-market/master/data/nse_symbols.json');
-                const symbols = await res.json();
-                const datalist = document.getElementById('allNseSymbols');
-                symbols.forEach(sym => {
-                    let opt = document.createElement('option');
-                    opt.value = sym;
-                    datalist.appendChild(opt);
-                });
-            } catch (e) { console.log("Suggestion load failed"); }
-        }
-
-        // 2. Main Fetch Logic
-        async function refreshData() {
-            try {
-                // We send the current watchlist to Google Script
-                const res = await fetch(`${googleScriptUrl}?symbols=${watchlist.join(',')}`);
+                const res = await fetch(googleScriptUrl);
                 const json = await res.json();
                 const body = document.getElementById('tableBody');
                 body.innerHTML = '';
 
                 json.data.forEach(stock => {
-                    const isPos = parseFloat(stock.pChange) >= 0;
+                    const color = stock.pChange >= 0 ? 'text-green-600' : 'text-red-600';
                     body.innerHTML += `
-                        <tr>
-                            <td class="p-4 font-bold text-slate-700">${stock.symbol}</td>
-                            <td class="p-4 text-right font-mono font-medium">₹${stock.lastPrice}</td>
-                            <td class="p-4 text-right font-mono font-bold ${isPos ? 'text-green-600' : 'text-red-600'}">
-                                ${isPos ? '+' : ''}${stock.pChange}%
-                            </td>
-                            <td class="p-4 text-right">
-                                <button onclick="removeFromList('${stock.symbol}')" class="text-slate-300 hover:text-red-500">✕</button>
-                            </td>
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3 font-bold">${stock.symbol}</td>
+                            <td class="p-3 text-right font-mono">${stock.lastPrice}</td>
+                            <td class="p-3 text-right font-mono font-bold ${color}">${stock.pChange}%</td>
                         </tr>`;
                 });
-                countdown = 10;
+                filterTable(); // Re-apply search filter after refresh
             } catch (e) { console.error(e); }
         }
 
-        function addToWatchlist() {
-            const val = document.getElementById('stockSearch').value.toUpperCase().trim();
-            if (val && !watchlist.includes(val)) {
-                watchlist.push(val);
-                document.getElementById('stockSearch').value = '';
-                refreshData();
-            }
+        function filterTable() {
+            const query = document.getElementById('searchInput').value.toUpperCase();
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                const text = row.cells[0].innerText.toUpperCase();
+                row.style.display = text.includes(query) ? "" : "none";
+            });
         }
 
-        function removeFromList(sym) {
-            watchlist = watchlist.filter(s => s !== sym);
-            refreshData();
-        }
+        // Listen for typing to filter instantly
+        document.getElementById('searchInput').addEventListener('input', filterTable);
 
-        // Timer
-        setInterval(() => {
-            countdown--;
-            if (countdown <= 0) refreshData();
-            document.getElementById('timer').innerText = `Refreshes in ${countdown}s`;
-        }, 1000);
-
-        loadSuggestions();
-        refreshData();
+        loadData();
+        setInterval(loadData, 30000);
     </script>
 </body>
 </html>
