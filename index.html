@@ -1,79 +1,117 @@
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NSE Pro Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 p-4 font-sans">
 
-        <footer class="mt-6 text-center">
-            <p id="refreshNotice" class="text-xs text-slate-400 font-medium tracking-wide">
-                Data automatically refreshes every <span id="seconds">10</span> seconds during market hours.
-            </p>
-        </footer>
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-6 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-slate-800">NSE Live Watchlist</h1>
+            <p id="timer" class="text-xs font-mono text-blue-600 font-bold bg-blue-100 px-3 py-1 rounded-full">Refreshes in 10s</p>
+        </header>
+
+        <div class="flex gap-2 mb-8">
+            <div class="relative flex-1">
+                <input list="allNseSymbols" id="stockSearch" placeholder="Type ANY NSE Symbol (e.g. ZOMATO, TATAMOTORS)..." 
+                    class="w-full p-4 rounded-xl border-none shadow-md focus:ring-2 focus:ring-blue-500 outline-none">
+                
+                <datalist id="allNseSymbols">
+                    </datalist>
+            </div>
+            <button onclick="addToWatchlist()" class="bg-slate-800 text-white px-8 rounded-xl font-bold hover:bg-black transition-all">
+                ADD TO LIST
+            </button>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 border-b">
+                    <tr>
+                        <th class="p-4 text-xs font-bold text-slate-400 uppercase">Symbol</th>
+                        <th class="p-4 text-right text-xs font-bold text-slate-400 uppercase">Price</th>
+                        <th class="p-4 text-right text-xs font-bold text-slate-400 uppercase">Change %</th>
+                        <th class="p-4"></th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        // REPLACE with your actual Google Script Web App URL
-        const googleScriptUrl = "https://script.google.com/macros/s/AKfycbyuZjax1MdlFZhdBvmskxmUPQNxgzYsCDTzLUwX3p3-CzpDTgZOKQNzV2c_K1qnqAJx/exec"; 
-        
-        let countdown = 10;
+        const googleScriptUrl = "YOUR_SCRIPT_URL_HERE";
         let watchlist = ["NIFTY 50", "RELIANCE", "TCS", "HDFCBANK", "INFY"];
+        let countdown = 10;
 
-        async function fetchMarketData() {
-            const statusLabel = document.getElementById('timer'); // Assuming you have a timer label
+        // 1. Fetch ALL NSE Symbols for the suggestions dropdown
+        async function loadSuggestions() {
             try {
-                // Fetching data for all symbols in the watchlist
-                const response = await fetch(`${googleScriptUrl}?symbols=${watchlist.join(',')}`);
-                const result = await response.json();
-                const tableBody = document.getElementById('tableBody');
-                
-                tableBody.innerHTML = '';
-                
-                result.data.forEach(stock => {
-                    const change = parseFloat(stock.pChange);
-                    const color = change >= 0 ? "text-green-600" : "text-red-600";
-                    const bg = change >= 0 ? "bg-green-50" : "bg-red-50";
-                    
-                    tableBody.innerHTML += `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap font-bold text-slate-800">${stock.symbol}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right font-mono font-medium">₹${stock.lastPrice}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right font-mono font-bold ${color}">
-                                <span class="px-2 py-1 rounded ${bg}">${change > 0 ? '+' : ''}${stock.pChange}%</span>
+                // Fetching a public list of NSE symbols
+                const res = await fetch('https://raw.githubusercontent.com/senthilp/indian-stock-market/master/data/nse_symbols.json');
+                const symbols = await res.json();
+                const datalist = document.getElementById('allNseSymbols');
+                symbols.forEach(sym => {
+                    let opt = document.createElement('option');
+                    opt.value = sym;
+                    datalist.appendChild(opt);
+                });
+            } catch (e) { console.log("Suggestion load failed"); }
+        }
+
+        // 2. Main Fetch Logic
+        async function refreshData() {
+            try {
+                // We send the current watchlist to Google Script
+                const res = await fetch(`${googleScriptUrl}?symbols=${watchlist.join(',')}`);
+                const json = await res.json();
+                const body = document.getElementById('tableBody');
+                body.innerHTML = '';
+
+                json.data.forEach(stock => {
+                    const isPos = parseFloat(stock.pChange) >= 0;
+                    body.innerHTML += `
+                        <tr>
+                            <td class="p-4 font-bold text-slate-700">${stock.symbol}</td>
+                            <td class="p-4 text-right font-mono font-medium">₹${stock.lastPrice}</td>
+                            <td class="p-4 text-right font-mono font-bold ${isPos ? 'text-green-600' : 'text-red-600'}">
+                                ${isPos ? '+' : ''}${stock.pChange}%
+                            </td>
+                            <td class="p-4 text-right">
+                                <button onclick="removeFromList('${stock.symbol}')" class="text-slate-300 hover:text-red-500">✕</button>
                             </td>
                         </tr>`;
                 });
-
-                // Reset countdown only after successful fetch
-                countdown = 10; 
-            } catch (error) {
-                console.error("Fetch error:", error);
-                // If it fails, wait a bit longer before retrying
-                countdown = 5; 
-            }
+                countdown = 10;
+            } catch (e) { console.error(e); }
         }
 
-        // Timer Logic: Updates the UI every second
-        setInterval(() => {
-            countdown--;
-            
-            // Update the Footer text dynamically
-            const secondsSpan = document.getElementById('seconds');
-            if(secondsSpan) secondsSpan.innerText = countdown > 0 ? countdown : 10;
-
-            if (countdown <= 0) {
-                fetchMarketData();
-            }
-        }, 1000);
-
-        // Function to add new stocks (from your search bar)
         function addToWatchlist() {
-            const input = document.getElementById('stockSearch');
-            const val = input.value.toUpperCase().trim();
+            const val = document.getElementById('stockSearch').value.toUpperCase().trim();
             if (val && !watchlist.includes(val)) {
                 watchlist.push(val);
-                input.value = '';
-                fetchMarketData(); // Immediate refresh
+                document.getElementById('stockSearch').value = '';
+                refreshData();
             }
         }
 
-        // Initial load
-        fetchMarketData();
+        function removeFromList(sym) {
+            watchlist = watchlist.filter(s => s !== sym);
+            refreshData();
+        }
+
+        // Timer
+        setInterval(() => {
+            countdown--;
+            if (countdown <= 0) refreshData();
+            document.getElementById('timer').innerText = `Refreshes in ${countdown}s`;
+        }, 1000);
+
+        loadSuggestions();
+        refreshData();
     </script>
 </body>
 </html>
