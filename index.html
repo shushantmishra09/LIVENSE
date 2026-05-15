@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NSE Live Watchlist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-5">
+
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-5">NSE Live Market</h1>
+
+        <div class="flex gap-2 mb-6">
+            <input list="stockSuggestions" id="searchInput" placeholder="Type stock name..." 
+                   class="flex-1 p-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            
+            <datalist id="stockSuggestions">
+                <option value="NIFTY 50">
+                <option value="RELIANCE">
+                <option value="TCS">
+                <option value="HDFCBANK">
+                <option value="INFY">
+                <option value="SBIN">
+                <option value="ICICIBANK">
+            </datalist>
+
+            <button onclick="filterTable()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+                Search
+            </button>
+        </div>
+
+        <div class="bg-white rounded shadow overflow-hidden">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-200">
+                    <tr>
+                        <th class="p-3 border">Symbol</th>
+                        <th class="p-3 border text-right">Price</th>
+                        <th class="p-3 border text-right">Change %</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const googleScriptUrl = "YOUR_WEB_APP_URL_HERE";
+
+        async function loadData() {
+            try {
+                const res = await fetch(googleScriptUrl);
+                const json = await res.json();
+                const body = document.getElementById('tableBody');
+                body.innerHTML = '';
+
+                json.data.forEach(stock => {
+                    const color = stock.pChange >= 0 ? 'text-green-600' : 'text-red-600';
+                    body.innerHTML += `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3 font-bold">${stock.symbol}</td>
+                            <td class="p-3 text-right font-mono">${stock.lastPrice}</td>
+                            <td class="p-3 text-right font-mono font-bold ${color}">${stock.pChange}%</td>
+                        </tr>`;
+                });
+                filterTable(); // Re-apply search filter after refresh
+            } catch (e) { console.error(e); }
+        }
+
+        function filterTable() {
+            const query = document.getElementById('searchInput').value.toUpperCase();
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                const text = row.cells[0].innerText.toUpperCase();
+                row.style.display = text.includes(query) ? "" : "none";
+            });
+        }
+
+        // Listen for typing to filter instantly
+        document.getElementById('searchInput').addEventListener('input', filterTable);
+
+        loadData();
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
